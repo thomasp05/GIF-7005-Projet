@@ -10,7 +10,8 @@ class CNN_block(torch.nn.Module):
         self.layer = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels, out_channels, [3, 3], 1, 1),
             torch.nn.BatchNorm2d(out_channels),
-            torch.nn.LeakyReLU()
+            torch.nn.LeakyReLU(),
+            torch.nn.MaxPool2d([2, 2], 2)
         )
 
     def forward(self, x):
