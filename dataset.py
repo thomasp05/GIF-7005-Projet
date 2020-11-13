@@ -1,12 +1,10 @@
 import copy
 
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from pydicom import dcmread
-
-train_labels_csv = '../stage_2_train_labels.csv'
-train_images_folder = '../stage_2_train_images'
 
 
 def train_test_split(dataset, test_size=0.2, shuffle=True):
@@ -66,12 +64,9 @@ class dcm_dataset(torch.utils.data.Dataset):
 if __name__ == "__main__":
 
     # Display some examples
-
-    dset = dcm_dataset('..')
+    dset = dcm_dataset('.')
 
     idx = np.random.randint(0, len(dset), 8)
-
-    # plt.figure(figsize=[10, 2])
 
     for i in range(idx.shape[0]):
 
@@ -79,7 +74,15 @@ if __name__ == "__main__":
 
         img, target = dset[idx[i]]
 
-        plt.imshow(img)
+        plt.imshow(img.squeeze())
+        ax = plt.gca()
+
+        if int(target) == 1:
+            x_min, y_min, width, height = dset.data_csv[idx[i], 1:-1]
+            if (x_min != '') and (y_min != '') and (width != '') and (height != ''):
+                rect = patches.Rectangle((float(x_min), float(y_min)), float(
+                    width), float(height), linewidth=2, edgecolor='r', facecolor='none')
+                ax.add_patch(rect)
         plt.title(target)
         plt.axis('off')
     plt.tight_layout()
