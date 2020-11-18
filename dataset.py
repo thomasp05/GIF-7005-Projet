@@ -100,16 +100,22 @@ class dcm_dataset(torch.utils.data.Dataset):
 
             plt.subplot(int('24{}'.format(i + 1)))
 
-            img, (target, bounding_box) = self[idx[i]]
+            img, (target, _) = self[idx[i]]
+            _, bounding_box = self.targets[idx[i]]
 
             plt.imshow(img.squeeze())
             ax = plt.gca()
 
             if int(target) == 1:
-                x_min, y_min, width, height = self.data_csv[idx[i], 1:-1]
-                if (x_min != '') and (y_min != '') and (width != '') and (height != ''):
-                    rect = patches.Rectangle((float(x_min), float(y_min)), float(
-                        width), float(height), linewidth=2, edgecolor='r', facecolor='none')
+                print(bounding_box)
+                for bounding_box_ in bounding_box:
+                    print(bounding_box_)
+                    x_min, y_min, width, height = bounding_box_
+
+                    rect = patches.Rectangle((float(x_min), float(y_min)),
+                                             float(width), float(height),
+                                             linewidth=2, edgecolor='r',
+                                             facecolor='none')
                     ax.add_patch(rect)
             plt.title(target)
             plt.axis('off')
