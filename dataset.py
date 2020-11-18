@@ -1,4 +1,5 @@
 import copy
+import os
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -35,55 +36,109 @@ class dcm_dataset(torch.utils.data.Dataset):
 
         self.directory = directory
 
-        self.img_directory = directory + '/' + 'stage_2_train_images'
+        img_directory = directory + '/' + 'stage_2_train_images'
+        self.img_files = self.explore_directory(img_directory)
 
         self.data_csv = np.genfromtxt(
             directory + '/' + 'stage_2_train_labels.csv',
             delimiter=',', skip_header=1, dtype='str')
 
+        self.id = np.unique(self.data_csv[:, 0])
+        self.targets = []
+        self.img_idx = []
+
+        for id in self.id:
+            # Récupérer le "dossier" de ce patient
+            info = self.data_csv[(self.data_csv[:, 0] == id)]
+            target = info[:, -1].astype(np.int).min()
+            if target == 0:
+                bounding_box = []
+            else:
+                bounding_box = info[:, 1:-1].astype(np.float).astype(np.int)
+            self.targets.append((target, bounding_box))
+
+            # Trouver l'indice de l'image associée
+            for idx in range(len(self.img_files)):
+                if id in self.img_files[idx]:
+                    self.img_idx.append(idx)
+                    continue
+
         self.transforms = transforms
 
     def __len__(self):
 
-        return self.data_csv.shape[0]
+        return len(self.img_files)
 
     def __getitem__(self, index):
 
-        img = torch.Tensor(dcmread(self.img_directory + '/' +
-                                   self.data_csv[index, 0] + '.dcm').pixel_array).unsqueeze(0)
+        patient_id = self.id[index]
+        targets = self.targets[index]
+        img_file = self.img_files[self.img_idx[index]]
 
-        target = self.data_csv[index, -1].astype(np.int)
+        img = torch.tensor(dcmread(img_file).pixel_array).unsqueeze(
+            0).to(torch.float)
+
+        target = torch.tensor(targets[0]).to(torch.float)
+
+        bounding_box = torch.zeros(img.shape).to(torch.float)
+
+        for bb in targets[1]:
+            bounding_box[:, bb[1]:bb[1] + bb[3], bb[0]:bb[0] +
+                         bb[2]] = torch.tensor(1.)
 
         if self.transforms:
 
-            img, target = self.transforms(img, target)
+            img, bounding_box = self.transforms(img, bounding_box)
 
-        return img, target
+        return img, (target, bounding_box)
 
+    def display(self):
 
-if __name__ == "__main__":
+        idx = np.random.randint(0, len(dset), 8)
 
-    # Display some examples
-    dset = dcm_dataset('.')
+        for i in range(idx.shape[0]):
 
-    idx = np.random.randint(0, len(dset), 8)
+            plt.subplot(int('24{}'.format(i + 1)))
 
-    for i in range(idx.shape[0]):
+            img, (target, bounding_box) = self[idx[i]]
 
-        plt.subplot(int('24{}'.format(i + 1)))
+            plt.imshow(img.squeeze())
+            ax = plt.gca()
 
-        img, target = dset[idx[i]]
+            if int(target) == 1:
+                x_min, y_min, width, height = self.data_csv[idx[i], 1:-1]
+                if (x_min != '') and (y_min != '') and (width != '') and (height != ''):
+                    rect = patches.Rectangle((float(x_min), float(y_min)), float(
+                        width), float(height), linewidth=2, edgecolor='r', facecolor='none')
+                    ax.add_patch(rect)
+            plt.title(target)
+            plt.axis('off')
 
-        plt.imshow(img.squeeze())
-        ax = plt.gca()
+        plt.tight_layout()
 
-        if int(target) == 1:
-            x_min, y_min, width, height = dset.data_csv[idx[i], 1:-1]
-            if (x_min != '') and (y_min != '') and (width != '') and (height != ''):
-                rect = patches.Rectangle((float(x_min), float(y_min)), float(
-                    width), float(height), linewidth=2, edgecolor='r', facecolor='none')
-                ax.add_patch(rect)
-        plt.title(target)
-        plt.axis('off')
-    plt.tight_layout()
-    plt.show()
+        plt.show()
+
+    def explore_directory(self, directory, ext='.dcm'):
+
+        if directory[-1] in ['/']:
+            directory = directory[:-1]
+
+        content = os.listdir(directory)
+
+        files_found = []
+
+        for file in content:
+            if os.path.isdir(directory + '/' + file):
+                # Found a subdirectory
+                sub_content = self.explore_directory(directory + '/' + file)
+
+                for sub_file in sub_content:
+
+                    files_found.append(sub_file)
+
+            elif os.path.isfile(directory + '/' + file):
+                if ext in file:
+
+                    files_found.append(directory + '/' + file)
+
+        return files_found
