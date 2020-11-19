@@ -8,7 +8,7 @@ import torch
 from pydicom import dcmread
 
 
-def train_test_split(dataset, test_size=0.2, shuffle=True):
+def train_test_split(dataset, test_size=0.2):
 
     test_set = copy.deepcopy(dataset)
     train_set = copy.deepcopy(dataset)
@@ -16,13 +16,15 @@ def train_test_split(dataset, test_size=0.2, shuffle=True):
     if isinstance(test_size, float):
         test_size = int(len(dataset) * test_size)
 
-    data_csv = dataset.data_csv
+        idx = torch.randperm(len(dataset))
+        train_idx = idx[test_size:]
+        test_idx = idx[:test_size]
 
-    if shuffle:
-        data_csv = data_csv[torch.randperm(data_csv.shape[0])]
+        test_set.id = test_set.id[test_idx]
+        test_set.update()
 
-    test_set.data_csv = data_csv[:test_size, :]
-    train_set.data_csv = data_csv[test_size:, :]
+        train_set.id = train_set.id[train_idx]
+        train_set.update()
 
     return train_set, test_set
 
@@ -47,27 +49,13 @@ class dcm_dataset(torch.utils.data.Dataset):
         self.targets = []
         self.img_idx = []
 
-        for id in self.id:
-            # Récupérer le "dossier" de ce patient
-            info = self.data_csv[(self.data_csv[:, 0] == id)]
-            target = info[:, -1].astype(np.int).min()
-            if target == 0:
-                bounding_box = []
-            else:
-                bounding_box = info[:, 1:-1].astype(np.float).astype(np.int)
-            self.targets.append((target, bounding_box))
-
-            # Trouver l'indice de l'image associée
-            for idx in range(len(self.img_files)):
-                if id in self.img_files[idx]:
-                    self.img_idx.append(idx)
-                    continue
+        self.update()
 
         self.transforms = transforms
 
     def __len__(self):
 
-        return len(self.img_files)
+        return len(self.id)
 
     def __getitem__(self, index):
 
@@ -107,9 +95,7 @@ class dcm_dataset(torch.utils.data.Dataset):
             ax = plt.gca()
 
             if int(target) == 1:
-                print(bounding_box)
                 for bounding_box_ in bounding_box:
-                    print(bounding_box_)
                     x_min, y_min, width, height = bounding_box_
 
                     rect = patches.Rectangle((float(x_min), float(y_min)),
@@ -148,3 +134,24 @@ class dcm_dataset(torch.utils.data.Dataset):
                     files_found.append(directory + '/' + file)
 
         return files_found
+
+    def update(self):
+
+        self.targets = []
+        self.img_idx = []
+
+        for id in self.id:
+            # Récupérer le "dossier" de ce patient
+            info = self.data_csv[(self.data_csv[:, 0] == id)]
+            target = info[:, -1].astype(np.int).min()
+            if target == 0:
+                bounding_box = []
+            else:
+                bounding_box = info[:, 1:-1].astype(np.float).astype(np.int)
+            self.targets.append((target, bounding_box))
+
+            # Trouver l'indice de l'image associée
+            for idx in range(len(self.img_files)):
+                if id in self.img_files[idx]:
+                    self.img_idx.append(idx)
+                    continue
