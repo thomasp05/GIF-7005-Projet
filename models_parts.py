@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import time
 from collections import defaultdict
 
 def double_conv(in_channels, out_channels):
