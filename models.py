@@ -136,7 +136,7 @@ class ResNetUNet(nn.Module):
     self.conv_up1 = conv_relu(64 + 256, 256, 3, 1)
     self.conv_up0 = conv_relu(64 + 256, 128, 3, 1)
 
-    self.conv_original_size0 = conv_relu(3, 64, 3, 1)
+    self.conv_original_size0 = conv_relu(1, 64, 3, 1)
     self.conv_original_size1 = conv_relu(64, 64, 3, 1)
     self.conv_original_size2 = conv_relu(64 + 128, 64, 3, 1)
 
