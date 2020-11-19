@@ -68,7 +68,7 @@ class UNet(nn.Module):
     def __init__(self, n_class):
         super().__init__()
 
-        self.dconv_down1 = double_conv(3, 64)
+        self.dconv_down1 = double_conv(1, 64)
         self.dconv_down2 = double_conv(64, 128)
         self.dconv_down3 = double_conv(128, 256)
         self.dconv_down4 = double_conv(256, 512)
