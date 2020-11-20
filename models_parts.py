@@ -49,6 +49,7 @@ def print_metrics(metrics, epoch_samples, phase):
 
     print("{}: {}".format(phase, ", ".join(outputs)))
 
+
 def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = "checkpoint.pt"):
     best_loss = 1e10
 
@@ -68,7 +69,8 @@ def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = 
             metrics = defaultdict(float)
             epoch_samples = 0
 
-            for inputs, labels in dataloaders[phase]:
+            for inputs, (labels, bounding_box) in dataloaders[phase]:
+                
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
