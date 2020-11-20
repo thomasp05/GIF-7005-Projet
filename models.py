@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision.models
 
-from .models_parts import *
+import models_parts
 
 
 class CNN_block(nn.Module):
