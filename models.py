@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision.models
 
-import models_parts
+from models_parts import double_conv, conv_relu
 
 
 class CNN_block(nn.Module):
