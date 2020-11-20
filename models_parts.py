@@ -7,7 +7,7 @@ from collections import defaultdict
 def double_conv(in_channels, out_channels):
     return nn.Sequential(
         conv_relu(in_channels, out_channels, 3, 1),
-        conv_relu(in_channels, out_channels, 3, 1)
+        conv_relu(out_channels, out_channels, 3, 1)
     )
 
 def conv_relu(in_channels, out_channels, kernel, padding):
