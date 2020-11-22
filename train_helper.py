@@ -41,7 +41,8 @@ def print_metrics(metrics, epoch_samples, phase):
 
 def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, checkpoint_path = "checkpoint.pt"):
     best_loss = 1e10
-
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + 1, num_epochs))
         print('-' * 20)
