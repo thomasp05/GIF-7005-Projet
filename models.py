@@ -100,6 +100,11 @@ class ResNetUNet(nn.Module):
     super().__init__()
 
     self.base_model = torchvision.models.resnet18(pretrained=True)
+    
+    avg_weights = torch.mean(self.base_model.conv1.weight, 1, True)
+    self.base_model.conv1 = nn.Conv2d(1, 64, 7, stride=2, padding=3, bias=False)
+    self.base_model.conv1.weight = nn.Parameter(avg_weights)
+    
     self.base_layers = list(self.base_model.children())
 
     self.layer0 = nn.Sequential(*self.base_layers[:3]) # size=(N, 64, x.H/2, x.W/2)
