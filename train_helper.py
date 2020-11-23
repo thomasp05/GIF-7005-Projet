@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -42,8 +43,7 @@ def print_metrics(metrics, epoch_samples, phase):
     print("{}: {}".format(phase, ", ".join(outputs)))
 
 
-def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, checkpoint_path = "checkpoint.pt"):
-    best_loss = 1e10
+def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, checkpoint_path = "checkpoint.pt", best_loss = 1e10):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     for epoch in range(num_epochs):
@@ -97,6 +97,7 @@ def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, chec
             if phase == 'val' and epoch_loss < best_loss:
                 print(f"saving best model to {checkpoint_path}")
                 best_loss = epoch_loss
+                
                 torch.save(model.state_dict(), checkpoint_path)
 
         time_elapsed = time.time() - since
@@ -106,7 +107,43 @@ def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, chec
 
     # load best model weights
     model.load_state_dict(torch.load(checkpoint_path))
+
+    save_checkpoint(epoch, model, optimizer, best_loss, checkpoint_path)
     return model
+
+
+def save_checkpoint(epoch, model, optimizer, best_loss, filename):
+    state = {'epoch': epoch + 1, 'state_dict': model.state_dict(),
+             'optimizer': optimizer.state_dict(), 'best_loss': best_loss}
+    torch.save(state, filename)
+
+def load_checkpoint(model, optimizer, filename):
+    ''' Note: Input model & optimizer should be pre-defined. 
+        This routine only updates their states. '''
+    start_epoch = 0
+    best_loss = 1e10
+    if os.path.isfile(filename):
+        print("=> loading checkpoint '{}'".format(filename))
+        checkpoint = torch.load(filename)
+        start_epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        best_loss = checkpoint['best_loss']
+        print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(filename, checkpoint['epoch']))
+    else:
+        print("=> no checkpoint found at '{}'".format(filename))
+
+    return model, optimizer, start_epoch, best_loss
+
+def transfer_optimizer_parts(optimizer):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # individually transfer the optimizer parts...
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
+
 
 
 def plot_img_array(img_array, ncol=3):
