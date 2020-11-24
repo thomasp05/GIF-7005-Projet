@@ -29,7 +29,7 @@ def run_test(model, dataloader, tests, device):
         pred_bounding_box[img_processed:img.shape[0]] = bounding_box_pred_
         real_labels[img_processed:img.shape[0]] = labels
         pred_labels[img_processed:img.shape[0]
-                    ] = bounding_box_pred_.max(-1).max(-1).squeeze()
+                    ] = bounding_box_pred_.flatten(-2, -1).max(-1).values.squeeze()
 
         for test in tests:
 
