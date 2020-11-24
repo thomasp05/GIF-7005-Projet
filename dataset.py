@@ -16,15 +16,15 @@ def train_test_split(dataset, test_size=0.2):
     if isinstance(test_size, float):
         test_size = int(len(dataset) * test_size)
 
-        idx = torch.randperm(len(dataset))
-        train_idx = idx[test_size:]
-        test_idx = idx[:test_size]
+    idx = torch.randperm(len(dataset))
+    train_idx = idx[test_size:]
+    test_idx = idx[:test_size]
 
-        test_set.id = test_set.id[test_idx]
-        test_set.update()
+    test_set.id = test_set.id[test_idx]
+    test_set.update()
 
-        train_set.id = train_set.id[train_idx]
-        train_set.update()
+    train_set.id = train_set.id[train_idx]
+    train_set.update()
 
     return train_set, test_set
 
