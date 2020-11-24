@@ -82,7 +82,7 @@ class dcm_dataset(torch.utils.data.Dataset):
 
     def display(self):
 
-        idx = np.random.randint(0, len(dset), 8)
+        idx = np.random.randint(0, len(self), 8)
 
         for i in range(idx.shape[0]):
 
@@ -155,3 +155,10 @@ class dcm_dataset(torch.utils.data.Dataset):
                 if id in self.img_files[idx]:
                     self.img_idx.append(idx)
                     continue
+
+    def subset(self, fraction=0.25):
+        idx_to_keep = torch.randint(
+            0, len(self.id), (int(fraction * len(self.id)), 1)).squeeze()
+
+        self.id = self.id[idx_to_keep]
+        self.update()
