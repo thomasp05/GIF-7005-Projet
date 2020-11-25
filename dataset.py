@@ -65,19 +65,11 @@ class dcm_dataset(torch.utils.data.Dataset):
 
         img = torch.tensor(dcmread(img_file).pixel_array).unsqueeze(
             0).to(torch.float)
-
         target = torch.tensor(targets[0]).to(torch.float)
 
         bounding_box = torch.zeros(img.shape).to(torch.float)
 
         for bb in targets[1]:
-            bounding_box[:, bb[1]:bb[1] + bb[3], bb[0]:bb[0] +
-                         bb[2]] = torch.tensor(1.)
-
-        if self.transforms:
-
-            img, bounding_box = self.transforms(img, bounding_box)
-
         return img, (target, bounding_box)
 
     def display(self):
