@@ -171,7 +171,7 @@ class Downsample:
     def __init__(self):
         self.pool = torch.nn.AvgPool2d(2)
 
-        def __call__(self, x, target):
-            x = self.pool(x.unsqueeze(0)).squeeze(0)
-            target = self.pool(target)
-            return x, target
+    def __call__(self, x, target):
+        x = self.pool(x.unsqueeze(0)).squeeze(0)
+        target = self.pool(target)
+        return x, target
