@@ -30,6 +30,7 @@ def train_test_split(dataset, test_size=0.2):
 
 
 class dcm_dataset(torch.utils.data.Dataset):
+
     def __init__(self, directory, transforms=None):
         """
         directory needs to contain the 'stage_2_train_labels.csv' file and the
@@ -65,11 +66,19 @@ class dcm_dataset(torch.utils.data.Dataset):
 
         img = torch.tensor(dcmread(img_file).pixel_array).unsqueeze(
             0).to(torch.float)
+
         target = torch.tensor(targets[0]).to(torch.float)
 
         bounding_box = torch.zeros(img.shape).to(torch.float)
 
         for bb in targets[1]:
+            bounding_box[:, bb[1]:bb[1] + bb[3], bb[0]:bb[0] +
+                         bb[2]] = torch.tensor(1.)
+
+        if self.transforms:
+
+            img, bounding_box = self.transforms(img, bounding_box)
+
         return img, (target, bounding_box)
 
     def display(self):
@@ -149,18 +158,20 @@ class dcm_dataset(torch.utils.data.Dataset):
                     continue
 
     def subset(self, fraction=0.25):
+
         idx_to_keep = torch.randint(
             0, len(self.id), (int(fraction * len(self.id)), 1)).squeeze()
 
         self.id = self.id[idx_to_keep]
         self.update()
 
-        
+
 class Downsample:
-  def __init__(self):
-    self.pool = torch.nn.AvgPool2d(2)
-    
-  def __call__(self, x, target):
-    x = self.pool(x.unsqueeze(0)).squeeze(0)
-    target = self.pool(target)
-    return x, target
+
+    def __init__(self):
+        self.pool = torch.nn.AvgPool2d(2)
+
+        def __call__(self, x, target):
+            x = self.pool(x.unsqueeze(0)).squeeze(0)
+            target = self.pool(target)
+            return x, target
