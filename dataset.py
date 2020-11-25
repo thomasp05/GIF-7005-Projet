@@ -16,15 +16,15 @@ def train_test_split(dataset, test_size=0.2):
     if isinstance(test_size, float):
         test_size = int(len(dataset) * test_size)
 
-        idx = torch.randperm(len(dataset))
-        train_idx = idx[test_size:]
-        test_idx = idx[:test_size]
+    idx = torch.randperm(len(dataset))
+    train_idx = idx[test_size:]
+    test_idx = idx[:test_size]
 
-        test_set.id = test_set.id[test_idx]
-        test_set.update()
+    test_set.id = test_set.id[test_idx]
+    test_set.update()
 
-        train_set.id = train_set.id[train_idx]
-        train_set.update()
+    train_set.id = train_set.id[train_idx]
+    train_set.update()
 
     return train_set, test_set
 
@@ -74,7 +74,7 @@ class dcm_dataset(torch.utils.data.Dataset):
 
     def display(self):
 
-        idx = np.random.randint(0, len(dset), 8)
+        idx = np.random.randint(0, len(self), 8)
 
         for i in range(idx.shape[0]):
 
@@ -148,6 +148,14 @@ class dcm_dataset(torch.utils.data.Dataset):
                     self.img_idx.append(idx)
                     continue
 
+    def subset(self, fraction=0.25):
+        idx_to_keep = torch.randint(
+            0, len(self.id), (int(fraction * len(self.id)), 1)).squeeze()
+
+        self.id = self.id[idx_to_keep]
+        self.update()
+
+        
 class Downsample:
   def __init__(self):
     self.pool = torch.nn.AvgPool2d(2)
