@@ -5,7 +5,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torchvision import transforms
+import torchvision.transforms
 from pydicom import dcmread
 
 
