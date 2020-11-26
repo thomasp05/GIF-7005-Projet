@@ -5,7 +5,9 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from torchvision import transforms
 from pydicom import dcmread
+
 
 
 def train_test_split(dataset, test_size=0.2):
@@ -174,4 +176,29 @@ class Downsample:
     def __call__(self, x, target):
         x = self.pool(x.unsqueeze(0)).squeeze(0)
         target = self.pool(target)
+        return x, target
+
+class ImageAugmentation:
+
+    def __init__(self ):
+        self.image_augmentation = Compose([
+            Resize(512),
+            RandomChoice([RandomHorizontalFlip(p=1),
+                                    RandomVerticalFlip(p=1),
+                                    AutoRandomRotation()]),
+            ColorJitter(brightness=(0.65, 1.35), contrast=(0.5, 1.5)),
+            RandomChoice([ColorJitter(saturation=(0, 2), hue=0.3),
+                                    HEDJitter(theta=0.05)])
+        ])
+
+        self.target_augmentation = Compose([
+            Resize(512),
+            RandomChoice([RandomHorizontalFlip(p=1),
+                                    RandomVerticalFlip(p=1),
+                                    AutoRandomRotation()])
+        ])
+
+    def __call__(self, x, target):
+        x = self.image_augmentation(x)
+        target = self.target_augmentation(target)
         return x, target
