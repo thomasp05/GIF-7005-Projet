@@ -178,27 +178,58 @@ class Downsample:
         target = self.pool(target)
         return x, target
 
+class Crop():
+    def __init__(self, max_shift):
+        self.max_shift = max_shift
+        
+    def __call__(self, sample):
+        origin, (target , mask) = sample
+        tl_shift = np.random.randint(0, self.max_shift)
+        br_shift = np.random.randint(0, self.max_shift)
+
+        origin_w, origin_h = torchvision.transforms.functional.to_pil_image(origin).size
+        crop_w = origin_w - tl_shift - br_shift
+        crop_h = origin_h - tl_shift - br_shift
+        
+        origin = torchvision.transforms.functional.crop(origin, tl_shift, tl_shift,
+                                                        crop_h, crop_w)
+        mask = torchvision.transforms.functional.crop(mask, tl_shift, tl_shift,
+                                                        crop_h, crop_w)
+        return origin, (target, mask)
+
+class Pad():
+    def __init__(self, max_padding):
+        self.max_padding = max_padding
+        
+    def __call__(self, sample):
+        origin, (target , mask) = sample
+        padding = np.random.randint(0, self.max_padding)
+
+        origin = torchvision.transforms.functional.pad(origin, padding=padding, fill=0)
+        mask = torchvision.transforms.functional.pad(mask, padding=padding, fill=0)
+        return origin, (target, mask)
+
+class Rotate():
+    def __init__(self, max_angle):
+        self.max_angle = max_angle
+        
+    def __call__(self, sample):
+        origin, (target , mask) = sample
+        angle = np.random.randint(-self.max_angle, self.max_angle)
+        
+        origin = torchvision.transforms.functional.rotate(origin, angle)
+        mask = torchvision.transforms.functional.rotate(mask, angle)
+        return origin, (target, mask)
+
+
 class ImageAugmentation:
-
     def __init__(self ):
-        self.image_augmentation = Compose([
-            Resize(512),
-            RandomChoice([RandomHorizontalFlip(p=1),
-                                    RandomVerticalFlip(p=1),
-                                    AutoRandomRotation()]),
-            ColorJitter(brightness=(0.65, 1.35), contrast=(0.5, 1.5)),
-            RandomChoice([ColorJitter(saturation=(0, 2), hue=0.3),
-                                    HEDJitter(theta=0.05)])
+        random.seed(111)
+        self.image_augmentation = torchvision.transforms.Compose([
+            Pad(200),
+            Crop(100),
+            Rotate(15)
         ])
 
-        self.target_augmentation = Compose([
-            Resize(512),
-            RandomChoice([RandomHorizontalFlip(p=1),
-                                    RandomVerticalFlip(p=1),
-                                    AutoRandomRotation()])
-        ])
-
-    def __call__(self, x, target):
-        x = self.image_augmentation(x)
-        target = self.target_augmentation(target)
-        return x, target
+    def __call__(self, sample):
+        return self.image_augmentation(sample)
