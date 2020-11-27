@@ -88,6 +88,9 @@ class dcm_dataset(torch.utils.data.Dataset):
         return sample
 
     def display(self):
+        """
+        Deprecated: doesn't work with transforms
+        """
 
         idx = np.random.randint(0, len(self), 8)
 
