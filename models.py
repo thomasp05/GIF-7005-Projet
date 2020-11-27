@@ -175,13 +175,13 @@ class FCN(nn.Module):
     def __init__(self, n_class):
         super().__init__()
         
-        self.base_model = models.resnet18(pretrained=True)
-        
+        self.base_model = torchvision.models.resnet18(pretrained=True)
+
         avg_weights = torch.mean(self.base_model.conv1.weight, 1, True)
         self.base_model.conv1 = nn.Conv2d(1, 64, 7, stride=2, padding=3, bias=False)
         self.base_model.conv1.weight = nn.Parameter(avg_weights)
         
-        layers = list(base_model.children())
+        layers = list(self.base_model.children())
         self.layer1 = nn.Sequential(*layers[:5]) # size=(N, 64, x.H/2, x.W/2)
         self.upsample1 = nn.Upsample(scale_factor=4, mode='bilinear')
         self.layer2 = layers[5]  # size=(N, 128, x.H/4, x.W/4)
