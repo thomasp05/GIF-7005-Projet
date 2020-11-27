@@ -1,5 +1,6 @@
 import copy
 import os
+import random
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -222,14 +223,26 @@ class Rotate():
         return origin, (target, mask)
 
 
-class ImageAugmentation:
+class ImageTransform:
     def __init__(self ):
-        random.seed(111)
-        self.image_augmentation = torchvision.transforms.Compose([
+        self.image_transform = torchvision.transforms.Compose([
             Pad(200),
             Crop(100),
             Rotate(15)
         ])
 
     def __call__(self, sample):
-        return self.image_augmentation(sample)
+        return self.image_transform(sample)
+
+class DataAugmentation:
+    def __init__(self, num_samples = 0):
+        self.num_samples = num_samples
+        self.transform = ImageTransform()
+
+    def __call__(self, samples):
+      new_dataset = []
+      for s in samples:
+        for n in range(self.num_samples):
+          new_dataset.append(self.transform(s))
+      samples = samples + new_dataset
+      return samples
