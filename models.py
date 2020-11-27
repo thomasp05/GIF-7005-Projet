@@ -95,30 +95,35 @@ class UNet(nn.Module):
         logits = self.outc(x)
         return logits
 
+
 class ResNetUNet(nn.Module):
   def __init__(self, n_class):
     super().__init__()
 
     self.base_model = torchvision.models.resnet18(pretrained=True)
-    
+
     avg_weights = torch.mean(self.base_model.conv1.weight, 1, True)
-    self.base_model.conv1 = nn.Conv2d(1, 64, 7, stride=2, padding=3, bias=False)
+    self.base_model.conv1 = nn.Conv2d(
+        1, 64, 7, stride=2, padding=3, bias=False)
     self.base_model.conv1.weight = nn.Parameter(avg_weights)
-    
+
     self.base_layers = list(self.base_model.children())
 
-    self.layer0 = nn.Sequential(*self.base_layers[:3]) # size=(N, 64, x.H/2, x.W/2)
+
+    self.layer0 = nn.Sequential(*self.base_layers[:3])
     self.layer0_1x1 = conv_relu(64, 64, 1, 0)
-    self.layer1 = nn.Sequential(*self.base_layers[3:5]) # size=(N, 64, x.H/4, x.W/4)
+
+    self.layer1 = nn.Sequential(*self.base_layers[3:5])
     self.layer1_1x1 = conv_relu(64, 64, 1, 0)
-    self.layer2 = self.base_layers[5]  # size=(N, 128, x.H/8, x.W/8)
+    self.layer2 = self.base_layers[5]
     self.layer2_1x1 = conv_relu(128, 128, 1, 0)
-    self.layer3 = self.base_layers[6]  # size=(N, 256, x.H/16, x.W/16)
+    self.layer3 = self.base_layers[6]
     self.layer3_1x1 = conv_relu(256, 256, 1, 0)
-    self.layer4 = self.base_layers[7]  # size=(N, 512, x.H/32, x.W/32)
+    self.layer4 = self.base_layers[7]
     self.layer4_1x1 = conv_relu(512, 512, 1, 0)
 
-    self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+    self.upsample = nn.Upsample(
+        scale_factor=2, mode='bilinear', align_corners=True)
 
     self.conv_up3 = conv_relu(256 + 512, 512, 3, 1)
     self.conv_up2 = conv_relu(128 + 512, 256, 3, 1)
@@ -170,30 +175,36 @@ class ResNetUNet(nn.Module):
 
     return out
 
+
 class FCN(nn.Module):
 
     def __init__(self, n_class):
         super().__init__()
-        
+
         self.base_model = torchvision.models.resnet18(pretrained=True)
 
         avg_weights = torch.mean(self.base_model.conv1.weight, 1, True)
-        self.base_model.conv1 = nn.Conv2d(1, 64, 7, stride=2, padding=3, bias=False)
+        self.base_model.conv1 = nn.Conv2d(
+            1, 64, 7, stride=2, padding=3, bias=False)
         self.base_model.conv1.weight = nn.Parameter(avg_weights)
-        
+
         layers = list(self.base_model.children())
-        self.layer1 = nn.Sequential(*layers[:5]) # size=(N, 64, x.H/2, x.W/2)
-        self.upsample1 = nn.Upsample(scale_factor=4, mode='bilinear')
-        self.layer2 = layers[5]  # size=(N, 128, x.H/4, x.W/4)
-        self.upsample2 = nn.Upsample(scale_factor=8, mode='bilinear')
-        self.layer3 = layers[6]  # size=(N, 256, x.H/8, x.W/8)
-        self.upsample3 = nn.Upsample(scale_factor=16, mode='bilinear')
-        self.layer4 = layers[7]  # size=(N, 512, x.H/16, x.W/16)
-        self.upsample4 = nn.Upsample(scale_factor=32, mode='bilinear')
-        
+        self.layer1 = nn.Sequential(*layers[:5])
+        self.upsample1 = nn.Upsample(
+            scale_factor=4, mode='bilinear', align_corners=True)
+        self.layer2 = layers[5]
+        self.upsample2 = nn.Upsample(
+            scale_factor=8, mode='bilinear', align_corners=True)
+        self.layer3 = layers[6]
+        self.upsample3 = nn.Upsample(
+            scale_factor=16, mode='bilinear', align_corners=True)
+        self.layer4 = layers[7]
+        self.upsample4 = nn.Upsample(
+            scale_factor=32, mode='bilinear', align_corners=True)
+
         self.conv1k = nn.Conv2d(64 + 128 + 256 + 512, n_class, 1)
         self.sigmoid = nn.Sigmoid()
-        
+
     def forward(self, x):
         x = self.layer1(x)
         up1 = self.upsample1(x)
@@ -203,9 +214,9 @@ class FCN(nn.Module):
         up3 = self.upsample3(x)
         x = self.layer4(x)
         up4 = self.upsample4(x)
-        
+
         merge = torch.cat([up1, up2, up3, up4], dim=1)
         merge = self.conv1k(merge)
         out = self.sigmoid(merge)
-        
+
         return out
