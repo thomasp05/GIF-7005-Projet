@@ -25,6 +25,7 @@ def train_test_split(dataset, test_size=0.2):
 
     test_set.id = test_set.id[test_idx]
     test_set.update()
+    test_set.transforms = None
 
     train_set.id = train_set.id[train_idx]
     train_set.update()

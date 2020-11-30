@@ -20,23 +20,22 @@ class Downsample:
 
 class Crop:
 
-    def __init__(self, max_shift):
-        self.max_shift = max_shift
+    def __init__(self, shape=(464, 464)):
+        self.shape = shape
 
     def __call__(self, sample):
         origin, (target, mask) = sample
-        tl_shift = np.random.randint(0, self.max_shift)
-        br_shift = np.random.randint(0, self.max_shift)
+        x_shift = np.random.randint(0, origin.shape[-2] - self.shape[0])
+        y_shift = np.random.randint(0, origin.shape[-1] - self.shape[1])
 
-        origin_w, origin_h = torchvision.transforms.functional.to_pil_image(
-            origin).size
-        crop_w = origin_w - tl_shift - br_shift
-        crop_h = origin_h - tl_shift - br_shift
+        origin = origin[:,
+                        x_shift:x_shift + self.shape[0],
+                        y_shift:y_shift + self.shape[1]]
 
-        origin = torchvision.transforms.functional.crop(origin, tl_shift, tl_shift,
-                                                        crop_h, crop_w)
-        mask = torchvision.transforms.functional.crop(mask, tl_shift, tl_shift,
-                                                      crop_h, crop_w)
+        mask = mask[:,
+                    x_shift:x_shift + self.shape[0],
+                    y_shift:y_shift + self.shape[1]]
+
         return origin, (target, mask)
 
 
@@ -75,7 +74,7 @@ class ImageTransform:
     def __init__(self):
         self.image_transform = torchvision.transforms.Compose([
             Pad(100),
-            Crop(100),
+            Crop(),
             Rotate(15)
         ])
 
