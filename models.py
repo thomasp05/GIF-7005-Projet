@@ -173,29 +173,3 @@ class ResNetUNet(nn.Module):
         out = self.conv_last(x)
 
         return out
-
-
-class ResNet18(nn.Module):
-
-    def __init__(self, pretrained=True):
-
-        super().__init__()
-
-        self.resnet18 = torchvision.models.resnet18(pretrained=pretrained)
-
-        avg_weights = torch.mean(self.resnet18.conv1.weight, 1, True)
-        self.resnet18.conv1 = nn.Conv2d(
-            1, 64, 7, stride=2, padding=3, bias=False)
-        self.resnet18.conv1.weight = nn.Parameter(avg_weights)
-
-        # Freeze layers
-        if pretrained:
-            for param in self.resnet18.parameters():
-                param.requires_grad = False
-
-        self.resnet18.fc = nn.Linear(512, 1)
-        self.resnet18.fc.requires_grad = True
-
-    def forward(self, x):
-
-        return self.resnet18(x)
