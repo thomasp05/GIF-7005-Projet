@@ -182,7 +182,6 @@ class Inception_v3(nn.Module):
         super().__init__()
 
         # resample to 299 x 299 spatial sizes
-        self.downsample = nn.AvgPool2d(2)
         self.upsample = nn.Upsample(
             size=(299, 299), mode='bilinear', align_corners=True)
 
@@ -197,7 +196,6 @@ class Inception_v3(nn.Module):
 
     def forward(self, x):
 
-        out = self.downsample(x)
         out = self.upsample(x)
 
         # To simulate 3 channels
