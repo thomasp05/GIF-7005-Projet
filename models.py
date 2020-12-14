@@ -203,4 +203,8 @@ class Inception_v3(nn.Module):
         out = torch.cat([out, out, out], dim=1)
         out = self.base_model(out)
 
-        return out.logits
+        return out
+
+    def predict(self, x):
+
+        return self.forward(x).logits
