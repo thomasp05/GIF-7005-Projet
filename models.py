@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models
+
 from models_parts import *
 
 
@@ -96,6 +97,7 @@ class UNet(nn.Module):
 
 
 class ResNetUNet(nn.Module):
+    
     def __init__(self, n_class):
         super().__init__()
 
@@ -136,6 +138,7 @@ class ResNetUNet(nn.Module):
         self.conv_last = nn.Conv2d(64, n_class, 1)
 
     def forward(self, input):
+        
         x_original = self.conv_original_size0(input)
         x_original = self.conv_original_size1(x_original)
 
@@ -171,5 +174,35 @@ class ResNetUNet(nn.Module):
         x = self.conv_original_size2(x)
 
         out = self.conv_last(x)
+
+        return out
+
+
+class Inception_v3(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+
+        # resample to 299 x 299 spatial sizes
+        self.upsample = nn.Upsample(
+            size=(299, 299), mode='bilinear', align_corners=True)
+
+        self.base_model = torchvision.models.inception_v3(pretrained=True)
+
+        # freeze everything but the last layer
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        self.base_model.fc = nn.Linear(2048, 1, bias=True)
+        self.base_model.AuxLogits.fc = nn.Linear(768, 1, bias=True)
+
+    def forward(self, x):
+
+        out = self.upsample(x)
+
+        # To simulate 3 channels
+        out = torch.cat([out, out, out], dim=1)
+        out = self.base_model(out)
 
         return out
