@@ -193,6 +193,7 @@ class Inception_v3(nn.Module):
             param.requires_grad = False
 
         self.base_model.fc = nn.Linear(2048, 1, bias=True)
+        self.base_model.AuxLogits.fc = nn.Linear(768, 1, bias=True)
 
     def forward(self, x):
 
