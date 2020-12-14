@@ -203,7 +203,3 @@ class Inception_v3(nn.Module):
         out = self.base_model(out)
 
         return out
-
-    def predict(self, x):
-
-        return self.forward(x).logits
