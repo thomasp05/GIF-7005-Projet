@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models
+
 from models_parts import *
 
 
@@ -96,6 +97,7 @@ class UNet(nn.Module):
 
 
 class ResNetUNet(nn.Module):
+    
     def __init__(self, n_class):
         super().__init__()
 
@@ -136,6 +138,7 @@ class ResNetUNet(nn.Module):
         self.conv_last = nn.Conv2d(64, n_class, 1)
 
     def forward(self, input):
+        
         x_original = self.conv_original_size0(input)
         x_original = self.conv_original_size1(x_original)
 

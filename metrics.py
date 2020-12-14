@@ -93,3 +93,30 @@ class Confusion_matrix:
         self.result = self.mat.sum(0)
 
         print(self.result)
+
+
+class Region_of_interest:
+
+    def __init__(self):
+
+        self.mat = None
+        self.result = None
+
+    def __call__(self, bb1, bb2, real_labels, pred_labels):
+
+        res_ = 0.
+
+        if bb2.flatten()[torch.argmax(bb1.flatten())] == 1:
+
+            res_ = 1.
+
+        if self.mat == None:
+            self.mat = torch.tensor(res_)
+        else:
+            self.mat = torch.cat([self.mat, res_])
+
+    def compute(self):
+
+        self.result = self.mat.sum() / self.numel()
+
+        print(self.result)
