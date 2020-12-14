@@ -20,7 +20,7 @@ class Downsample:
 
 class Crop:
 
-    def __init__(self, shape=(464, 464)):
+    def __init__(self, shape=(512, 512)):
         self.shape = shape
 
     def __call__(self, sample):
@@ -73,8 +73,6 @@ class ImageTransform:
 
     def __init__(self):
         self.image_transform = torchvision.transforms.Compose([
-            Pad(100),
-            Crop(),
             Rotate(15)
         ])
 
