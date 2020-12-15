@@ -179,7 +179,7 @@ class ResNetUNet(nn.Module):
 
 class Inception_v3(nn.Module):
 
-    def __init__(self):
+    def __init__(self, pretrained=True):
 
         super().__init__()
 
@@ -187,11 +187,12 @@ class Inception_v3(nn.Module):
         self.upsample = nn.Upsample(
             size=(299, 299), mode='bilinear', align_corners=True)
 
-        self.base_model = torchvision.models.inception_v3(pretrained=True)
+        self.base_model = torchvision.models.inception_v3(
+            pretrained=pretrained)
 
         # freeze everything but the last layer
         for param in self.base_model.parameters():
-            param.requires_grad = False
+            param.requires_grad = not pretrained
 
         self.base_model.fc = nn.Linear(2048, 1, bias=True)
         self.base_model.AuxLogits.fc = nn.Linear(768, 1, bias=True)
