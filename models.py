@@ -187,17 +187,17 @@ class FCN(nn.Module):
             1, 64, 7, stride=2, padding=3, bias=False)
         self.base_model.conv1.weight = nn.Parameter(avg_weights)
 
-        layers = list(self.base_model.children())
-        self.layer1 = nn.Sequential(*layers[:5])  # size=(N, 64, x.H/2, x.W/2)
+        self.base_layers = list(self.base_model.children())
+        self.layer1 = nn.Sequential(*self.base_layers[:5])  # size=(N, 64, x.H/2, x.W/2)
         self.upsample1 = nn.Upsample(
             scale_factor=4, mode='bilinear', align_corners=True)
-        self.layer2 = layers[5]  # size=(N, 128, x.H/4, x.W/4)
+        self.layer2 = self.base_layers[5]  # size=(N, 128, x.H/4, x.W/4)
         self.upsample2 = nn.Upsample(
             scale_factor=8, mode='bilinear', align_corners=True)
-        self.layer3 = layers[6]  # size=(N, 256, x.H/8, x.W/8)
+        self.layer3 = self.base_layers[6]  # size=(N, 256, x.H/8, x.W/8)
         self.upsample3 = nn.Upsample(
             scale_factor=16, mode='bilinear', align_corners=True)
-        self.layer4 = layers[7]  # size=(N, 512, x.H/16, x.W/16)
+        self.layer4 = self.base_layers[7]  # size=(N, 512, x.H/16, x.W/16)
         self.upsample4 = nn.Upsample(
             scale_factor=32, mode='bilinear', align_corners=True)
 
