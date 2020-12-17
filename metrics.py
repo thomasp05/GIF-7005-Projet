@@ -29,7 +29,7 @@ def run_test(model, dataloader, tests, device):
         test.compute()
 
 
-def run_test_ensemble(model1, model2, model3, dataloader, tests, device):
+def run_test_ensemble3(model1, model2, model3, dataloader, tests, device):
 
     img_processed = 0
 
@@ -48,6 +48,40 @@ def run_test_ensemble(model1, model2, model3, dataloader, tests, device):
 
         # compute average of predictions
         bounding_box_pred = (bounding_box_pred_model_1 + bounding_box_pred_model_2 + bounding_box_pred_model_3) / 3
+
+        bounding_box_pred[bounding_box_pred > 0.5] = 1
+        bounding_box_pred[bounding_box_pred < 0.5] = 0
+
+        pred_labels = bounding_box_pred.flatten(
+            -2, -1).max(-1).values.squeeze()
+
+        for test in tests:
+
+            test(bounding_box, bounding_box_pred, labels, pred_labels)
+
+    for test in tests:
+
+        test.compute()
+
+
+def run_test_ensemble2(model1, model2, dataloader, tests, device):
+
+    img_processed = 0
+
+    for i, data in enumerate(dataloader):
+
+        img, (labels, bounding_box) = data
+
+        img = img.to(device)
+        labels = labels.to(device)
+        bounding_box = bounding_box.to(device)
+
+        # compute prediction for all three models
+        bounding_box_pred_model_1 = model1(img)
+        bounding_box_pred_model_2 = model2(img)
+
+        # compute average of predictions
+        bounding_box_pred = (bounding_box_pred_model_1 + bounding_box_pred_model_2) / 2
 
         bounding_box_pred[bounding_box_pred > 0.5] = 1
         bounding_box_pred[bounding_box_pred < 0.5] = 0
