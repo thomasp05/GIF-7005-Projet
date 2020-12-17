@@ -45,6 +45,7 @@ def print_metrics(metrics, epoch_samples, phase):
 
 def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, checkpoint_path = "checkpoint.pt", best_loss = 1e10):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    save_temp = False
     
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + 1, num_epochs))
@@ -95,10 +96,11 @@ def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, chec
 
             # save the model weights
             if phase == 'val' and epoch_loss < best_loss:
-                print(f"saving best model to {checkpoint_path}")
+                print(f"saving best model to temp")
                 best_loss = epoch_loss
                 
-                torch.save(model.state_dict(), checkpoint_path)
+                torch.save(model.state_dict(), "temp.pth")
+                save_temp = True
 
         time_elapsed = time.time() - since
         print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -106,10 +108,14 @@ def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, chec
     print('Best val loss: {:4f}'.format(best_loss))
 
     # load best model weights
-    model.load_state_dict(torch.load(checkpoint_path))
+    if save_temp:
+        model.load_state_dict(torch.load("temp.pth"))
+    else:
+        model.load_state_dict(torch.load(checkpoint_path))
 
     save_checkpoint(epoch, model, optimizer, best_loss, checkpoint_path)
     return model
+
 
 
 def save_checkpoint(epoch, model, optimizer, best_loss, filename):
@@ -143,7 +149,6 @@ def transfer_optimizer_parts(optimizer):
         for k, v in state.items():
             if isinstance(v, torch.Tensor):
                 state[k] = v.to(device)
-
 
 
 def plot_img_array(img_array, ncol=3):
