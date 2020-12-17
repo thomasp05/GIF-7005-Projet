@@ -98,7 +98,7 @@ def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, chec
                 print(f"saving best model to {checkpoint_path}")
                 best_loss = epoch_loss
                 
-                torch.save(model.state_dict(), checkpoint_path)
+                save_checkpoint(epoch, model, optimizer, best_loss, checkpoint_path)
 
         time_elapsed = time.time() - since
         print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -106,10 +106,12 @@ def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, chec
     print('Best val loss: {:4f}'.format(best_loss))
 
     # load best model weights
-    model.load_state_dict(torch.load(checkpoint_path))
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['state_dict'])
 
     save_checkpoint(epoch, model, optimizer, best_loss, checkpoint_path)
     return model
+
 
 
 def save_checkpoint(epoch, model, optimizer, best_loss, filename):
@@ -143,7 +145,6 @@ def transfer_optimizer_parts(optimizer):
         for k, v in state.items():
             if isinstance(v, torch.Tensor):
                 state[k] = v.to(device)
-
 
 
 def plot_img_array(img_array, ncol=3):
