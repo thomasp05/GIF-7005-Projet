@@ -68,12 +68,19 @@ class Resnet_cam(nn.Module):
 
         self.relu = nn.ReLU()
 
+        self._return_fmap = False
+
     def forward(self, x):
 
-        out = self.layers(x)
-        out = self.avg_pool(out)
-        out = self.flatten(out)
-        out = self.fc(out)
+        if not self._return_fmap:
+
+            out = self.layers(x)
+            out = self.avg_pool(out)
+            out = self.flatten(out)
+            out = self.fc(out)
+
+        else:
+            out = self.grad_analysis(x)
 
         return out
 
@@ -103,3 +110,7 @@ class Resnet_cam(nn.Module):
                                        ).sum(dim=1, keepdims=True))
 
         return grad
+
+    def return_fmap(self, value=True):
+
+        self._return_fmap = value

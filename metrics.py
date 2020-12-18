@@ -99,7 +99,7 @@ class Region_of_interest:
 
     def __init__(self):
 
-        self.mat = None
+        self.mat = []
         self.result = None
 
     def __call__(self, bb1, bb2, real_labels, pred_labels):
@@ -110,13 +110,10 @@ class Region_of_interest:
 
             res_ = 1.
 
-        if self.mat == None:
-            self.mat = torch.tensor(res_)
-        else:
-            self.mat = torch.cat([self.mat, res_])
+        self.mat.append(res_)
 
     def compute(self):
 
-        self.result = self.mat.sum() / self.numel()
+        self.result = torch.tensor(self.mat).sum() / len(self.mat)
 
         print(self.result)
