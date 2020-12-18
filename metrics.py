@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import torch
 
 
@@ -14,11 +15,11 @@ def run_test(model, dataloader, tests, device):
         bounding_box = bounding_box.to(device)
 
         bounding_box_pred = model(img)
-        bounding_box_pred[bounding_box_pred > 0.5] = 1
-        bounding_box_pred[bounding_box_pred < 0.5] = 0
 
         pred_labels = bounding_box_pred.flatten(
             -2, -1).max(-1).values.squeeze()
+        pred_labels[pred_labels >= 0.5] = 1
+        pred_labels[pred_labels < 0.5] = 0
 
         for test in tests:
 
@@ -38,6 +39,9 @@ class IoU:
         self.result = None
 
     def __call__(self, bb1, bb2, *args):
+
+        bb2[bb2 >= 0.5] = 1
+        bb2[bb2 < 0.5] = 0
 
         intersection = torch.logical_and(
             bb1.detach(), bb2.detach()).sum()
@@ -104,13 +108,14 @@ class Region_of_interest:
 
     def __call__(self, bb1, bb2, real_labels, pred_labels):
 
-        res_ = 0.
+        if bb1.max() == 1.:
+            res_ = 0.
 
-        if bb2.flatten()[torch.argmax(bb1.flatten())] == 1:
+            if bb1.flatten()[torch.argmax(bb2.flatten())] == 1:
 
-            res_ = 1.
+                res_ = 1.
 
-        self.mat.append(res_)
+            self.mat.append(res_)
 
     def compute(self):
 
