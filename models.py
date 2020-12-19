@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torchvision.models
-
 from models_parts import *
 
 
@@ -97,7 +96,7 @@ class UNet(nn.Module):
 
 
 class ResNetUNet(nn.Module):
-    
+
     def __init__(self, n_class):
         super().__init__()
 
@@ -138,7 +137,7 @@ class ResNetUNet(nn.Module):
         self.conv_last = nn.Conv2d(64, n_class, 1)
 
     def forward(self, input):
-        
+
         x_original = self.conv_original_size0(input)
         x_original = self.conv_original_size1(x_original)
 
@@ -180,7 +179,7 @@ class ResNetUNet(nn.Module):
 
 class Inception_v3(nn.Module):
 
-    def __init__(self):
+    def __init__(self, pretrained=True):
 
         super().__init__()
 
@@ -188,11 +187,12 @@ class Inception_v3(nn.Module):
         self.upsample = nn.Upsample(
             size=(299, 299), mode='bilinear', align_corners=True)
 
-        self.base_model = torchvision.models.inception_v3(pretrained=True)
+        self.base_model = torchvision.models.inception_v3(
+            pretrained=pretrained)
 
         # freeze everything but the last layer
         for param in self.base_model.parameters():
-            param.requires_grad = False
+            param.requires_grad = not pretrained
 
         self.base_model.fc = nn.Linear(2048, 1, bias=True)
         self.base_model.AuxLogits.fc = nn.Linear(768, 1, bias=True)
@@ -207,7 +207,7 @@ class Inception_v3(nn.Module):
 
         return out
 
-      
+
 class FCN(nn.Module):
 
     def __init__(self, n_class):
@@ -246,4 +246,39 @@ class FCN(nn.Module):
         merge = self.conv1k(merge)
         out = self.sigmoid(merge)
         
+        return out        
+
+
+class DenseNet121(nn.Module):
+
+    def __init__(self, pretrained=True):
+
+        super().__init__()
+
+        # resample to 224 x 224 spatial sizes
+        self.upsample = nn.Upsample(
+            size=(224, 224), mode='bilinear', align_corners=True)
+
+        self.base_model = torch.hub.load(
+            'pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+
+        # reshape the ouput layer
+        self.base_model.classifier = nn.Linear(1024, 1)
+        self.base_model.classifier.requires_grad = True
+
+        # freeze everything but the last layer
+        for name, param in self.named_parameters():
+            if "classifier" in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = not pretrained
+
+    def forward(self, x):
+
+        out = self.upsample(x)
+
+        # To simulate 3 channels
+        out = torch.cat([out, out, out], dim=1)
+        out = self.base_model(out)
+
         return out
