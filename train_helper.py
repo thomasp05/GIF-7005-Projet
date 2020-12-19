@@ -1,82 +1,13 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 from collections import defaultdict
+from functools import reduce
 
-
-class DoubleConv(nn.Module):
-    """(convolution => [Batch Normalization] => ReLU) * 2"""
-
-    def __init__(self, in_channels, out_channels, mid_channels=None):
-        super().__init__()
-        if not mid_channels:
-            mid_channels = out_channels
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(mid_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-
-    def forward(self, x):
-        return self.double_conv(x)
-
-
-class Down(nn.Module):
-    """Downscaling with maxpool then double conv"""
-
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
-        )
-
-    def forward(self, x):
-        return self.maxpool_conv(x)
-
-class Up(nn.Module):
-    """Upscaling then double conv"""
-
-    def __init__(self, in_channels, out_channels, bilinear=True):
-        super().__init__()
-
-        # si bilinéaire, utilisez les convolutions normales pour réduire le nombre de channels
-        if bilinear:
-            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
-        else:
-            self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
-
-
-    def forward(self, x1, x2):
-        x1 = self.up(x1)
-        # input est C H W
-        diffY = x2.size()[2] - x1.size()[2]
-        diffX = x2.size()[3] - x1.size()[3]
-
-        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
-                        diffY // 2, diffY - diffY // 2])
-        x = torch.cat([x2, x1], dim=1)
-        return self.conv(x)
-
-class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-
-    def forward(self, x):
-        return self.conv(x)
-
-def conv_relu(in_channels, out_channels, kernel, padding):
-  return nn.Sequential(
-    nn.Conv2d(in_channels, out_channels, kernel, padding=padding),
-    nn.ReLU(inplace=True)
-  )
 
 # Source: A survey of loss functions for semantic segmentation https://arxiv.org/pdf/2006.14822.pdf
 def dice_loss(pred, target, smooth = 1.):
@@ -112,12 +43,12 @@ def print_metrics(metrics, epoch_samples, phase):
     print("{}: {}".format(phase, ", ".join(outputs)))
 
 
-def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = "checkpoint.pt"):
-    best_loss = 1e10
-
+def train_model(model, optimizer, scheduler, data_loaders, num_epochs = 10, checkpoint_path = "checkpoint.pt", best_loss = 1e10):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        print('-' * 10)
+        print('Epoch {}/{}'.format(epoch + 1, num_epochs))
+        print('-' * 20)
 
         since = time.time()
 
@@ -131,10 +62,11 @@ def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = 
             metrics = defaultdict(float)
             epoch_samples = 0
 
-            for inputs, (labels, bounding_box) in dataloaders[phase]:
+            for inputs, (labels, bounding_box) in data_loaders[phase]:
                 
                 inputs = inputs.to(device)
-                labels = labels.to(device)
+                #labels = labels.to(device)
+                bounding_box = bounding_box.to(device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -143,7 +75,7 @@ def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = 
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
-                    loss = calc_loss(outputs, labels, metrics)
+                    loss = calc_loss(outputs, bounding_box, metrics)
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -165,6 +97,7 @@ def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = 
             if phase == 'val' and epoch_loss < best_loss:
                 print(f"saving best model to {checkpoint_path}")
                 best_loss = epoch_loss
+                
                 torch.save(model.state_dict(), checkpoint_path)
 
         time_elapsed = time.time() - since
@@ -174,4 +107,55 @@ def train_model(model, optimizer, scheduler, num_epochs = 25, checkpoint_path = 
 
     # load best model weights
     model.load_state_dict(torch.load(checkpoint_path))
+
+    save_checkpoint(epoch, model, optimizer, best_loss, checkpoint_path)
     return model
+
+
+def save_checkpoint(epoch, model, optimizer, best_loss, filename):
+    state = {'epoch': epoch + 1, 'state_dict': model.state_dict(),
+             'optimizer': optimizer.state_dict(), 'best_loss': best_loss}
+    torch.save(state, filename)
+
+def load_checkpoint(model, optimizer, filename):
+    ''' Note: Input model & optimizer should be pre-defined. 
+        This routine only updates their states. '''
+    start_epoch = 0
+    best_loss = 1e10
+    if os.path.isfile(filename):
+        print("=> loading checkpoint '{}'".format(filename))
+        checkpoint = torch.load(filename)
+        start_epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        best_loss = checkpoint['best_loss']
+        print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(filename, checkpoint['epoch']))
+    else:
+        print("=> no checkpoint found at '{}'".format(filename))
+
+    return model, optimizer, start_epoch, best_loss
+
+def transfer_optimizer_parts(optimizer):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # individually transfer the optimizer parts...
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
+
+
+
+def plot_img_array(img_array, ncol=3):
+    nrow = len(img_array) // ncol
+
+    f, plots = plt.subplots(nrow, ncol, sharex='all', sharey='all', figsize=(ncol * 4, nrow * 4))
+
+    for i in range(len(img_array)):
+        plots[i // ncol, i % ncol]
+        plots[i // ncol, i % ncol].imshow(img_array[i])
+
+
+def plot_side_by_side(img_arrays):
+    flatten_list = reduce(lambda x,y: x+y, zip(*img_arrays))
+    plot_img_array(np.array(flatten_list), ncol=len(img_arrays))

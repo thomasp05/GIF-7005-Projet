@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torchvision.models
-
 from models_parts import *
 
 
@@ -64,119 +63,181 @@ class Simple_regressor(nn.Module):
 
 
 class UNet(nn.Module):
+    def __init__(self, n_channels, n_classes, bilinear=True):
+        super(UNet, self).__init__()
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        self.bilinear = bilinear
+
+        self.inc = DoubleConv(n_channels, 64)
+        self.down1 = Down(64, 128)
+        self.down2 = Down(128, 256)
+        self.down3 = Down(256, 512)
+        factor = 2 if bilinear else 1
+        self.down4 = Down(512, 1024 // factor)
+        self.up1 = Up(1024, 512 // factor, bilinear)
+        self.up2 = Up(512, 256 // factor, bilinear)
+        self.up3 = Up(256, 128 // factor, bilinear)
+        self.up4 = Up(128, 64, bilinear)
+        self.outc = OutConv(64, n_classes)
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x, x2)
+        x = self.up4(x, x1)
+        logits = self.outc(x)
+        return logits
+
+
+class ResNetUNet(nn.Module):
 
     def __init__(self, n_class):
         super().__init__()
 
-        self.dconv_down1 = double_conv(1, 64)
-        self.dconv_down2 = double_conv(64, 128)
-        self.dconv_down3 = double_conv(128, 256)
-        self.dconv_down4 = double_conv(256, 512)
+        self.base_model = torchvision.models.resnet18(pretrained=True)
 
-        self.maxpool = nn.MaxPool2d(2)
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        avg_weights = torch.mean(self.base_model.conv1.weight, 1, True)
+        self.base_model.conv1 = nn.Conv2d(
+            1, 64, 7, stride=2, padding=3, bias=False)
+        self.base_model.conv1.weight = nn.Parameter(avg_weights)
 
-        self.dconv_up3 = double_conv(256 + 512, 256)
-        self.dconv_up2 = double_conv(128 + 256, 128)
-        self.dconv_up1 = double_conv(128 + 64, 64)
+        self.base_layers = list(self.base_model.children())
+
+        # size=(N, 64, x.H/2, x.W/2)
+        self.layer0 = nn.Sequential(*self.base_layers[:3])
+        self.layer0_1x1 = conv_relu(64, 64, 1, 0)
+        # size=(N, 64, x.H/4, x.W/4)
+        self.layer1 = nn.Sequential(*self.base_layers[3:5])
+        self.layer1_1x1 = conv_relu(64, 64, 1, 0)
+        self.layer2 = self.base_layers[5]  # size=(N, 128, x.H/8, x.W/8)
+        self.layer2_1x1 = conv_relu(128, 128, 1, 0)
+        self.layer3 = self.base_layers[6]  # size=(N, 256, x.H/16, x.W/16)
+        self.layer3_1x1 = conv_relu(256, 256, 1, 0)
+        self.layer4 = self.base_layers[7]  # size=(N, 512, x.H/32, x.W/32)
+        self.layer4_1x1 = conv_relu(512, 512, 1, 0)
+
+        self.upsample = nn.Upsample(
+            scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv_up3 = conv_relu(256 + 512, 512, 3, 1)
+        self.conv_up2 = conv_relu(128 + 512, 256, 3, 1)
+        self.conv_up1 = conv_relu(64 + 256, 256, 3, 1)
+        self.conv_up0 = conv_relu(64 + 256, 128, 3, 1)
+
+        self.conv_original_size0 = conv_relu(1, 64, 3, 1)
+        self.conv_original_size1 = conv_relu(64, 64, 3, 1)
+        self.conv_original_size2 = conv_relu(64 + 128, 64, 3, 1)
 
         self.conv_last = nn.Conv2d(64, n_class, 1)
 
-    def forward(self, x):
-        conv1 = self.dconv_down1(x)
-        x = self.maxpool(conv1)
+    def forward(self, input):
 
-        conv2 = self.dconv_down2(x)
-        x = self.maxpool(conv2)
+        x_original = self.conv_original_size0(input)
+        x_original = self.conv_original_size1(x_original)
 
-        conv3 = self.dconv_down3(x)
-        x = self.maxpool(conv3)
+        layer0 = self.layer0(input)
+        layer1 = self.layer1(layer0)
+        layer2 = self.layer2(layer1)
+        layer3 = self.layer3(layer2)
+        layer4 = self.layer4(layer3)
 
-        x = self.dconv_down4(x)
+        layer4 = self.layer4_1x1(layer4)
+        x = self.upsample(layer4)
+        layer3 = self.layer3_1x1(layer3)
+        x = torch.cat([x, layer3], dim=1)
+        x = self.conv_up3(x)
 
         x = self.upsample(x)
-        x = torch.cat([x, conv3], dim=1)
+        layer2 = self.layer2_1x1(layer2)
+        x = torch.cat([x, layer2], dim=1)
+        x = self.conv_up2(x)
 
-        x = self.dconv_up3(x)
         x = self.upsample(x)
-        x = torch.cat([x, conv2], dim=1)
+        layer1 = self.layer1_1x1(layer1)
+        x = torch.cat([x, layer1], dim=1)
+        x = self.conv_up1(x)
 
-        x = self.dconv_up2(x)
         x = self.upsample(x)
-        x = torch.cat([x, conv1], dim=1)
+        layer0 = self.layer0_1x1(layer0)
+        x = torch.cat([x, layer0], dim=1)
+        x = self.conv_up0(x)
 
-        x = self.dconv_up1(x)
+        x = self.upsample(x)
+        x = torch.cat([x, x_original], dim=1)
+        x = self.conv_original_size2(x)
 
         out = self.conv_last(x)
 
         return out
 
-class ResNetUNet(nn.Module):
-  def __init__(self, n_class):
-    super().__init__()
 
-    self.base_model = torchvision.models.resnet18(pretrained=True)
-    self.base_layers = list(self.base_model.children())
+class Inception_v3(nn.Module):
 
-    self.layer0 = nn.Sequential(*self.base_layers[:3]) # size=(N, 64, x.H/2, x.W/2)
-    self.layer0_1x1 = conv_relu(64, 64, 1, 0)
-    self.layer1 = nn.Sequential(*self.base_layers[3:5]) # size=(N, 64, x.H/4, x.W/4)
-    self.layer1_1x1 = conv_relu(64, 64, 1, 0)
-    self.layer2 = self.base_layers[5]  # size=(N, 128, x.H/8, x.W/8)
-    self.layer2_1x1 = conv_relu(128, 128, 1, 0)
-    self.layer3 = self.base_layers[6]  # size=(N, 256, x.H/16, x.W/16)
-    self.layer3_1x1 = conv_relu(256, 256, 1, 0)
-    self.layer4 = self.base_layers[7]  # size=(N, 512, x.H/32, x.W/32)
-    self.layer4_1x1 = conv_relu(512, 512, 1, 0)
+    def __init__(self, pretrained=True):
 
-    self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        super().__init__()
 
-    self.conv_up3 = conv_relu(256 + 512, 512, 3, 1)
-    self.conv_up2 = conv_relu(128 + 512, 256, 3, 1)
-    self.conv_up1 = conv_relu(64 + 256, 256, 3, 1)
-    self.conv_up0 = conv_relu(64 + 256, 128, 3, 1)
+        # resample to 299 x 299 spatial sizes
+        self.upsample = nn.Upsample(
+            size=(299, 299), mode='bilinear', align_corners=True)
 
-    self.conv_original_size0 = conv_relu(1, 64, 3, 1)
-    self.conv_original_size1 = conv_relu(64, 64, 3, 1)
-    self.conv_original_size2 = conv_relu(64 + 128, 64, 3, 1)
+        self.base_model = torchvision.models.inception_v3(
+            pretrained=pretrained)
 
-    self.conv_last = nn.Conv2d(64, n_class, 1)
+        # freeze everything but the last layer
+        for param in self.base_model.parameters():
+            param.requires_grad = not pretrained
 
-  def forward(self, input):
-    x_original = self.conv_original_size0(input)
-    x_original = self.conv_original_size1(x_original)
+        self.base_model.fc = nn.Linear(2048, 1, bias=True)
+        self.base_model.AuxLogits.fc = nn.Linear(768, 1, bias=True)
 
-    layer0 = self.layer0(input)
-    layer1 = self.layer1(layer0)
-    layer2 = self.layer2(layer1)
-    layer3 = self.layer3(layer2)
-    layer4 = self.layer4(layer3)
+    def forward(self, x):
 
-    layer4 = self.layer4_1x1(layer4)
-    x = self.upsample(layer4)
-    layer3 = self.layer3_1x1(layer3)
-    x = torch.cat([x, layer3], dim=1)
-    x = self.conv_up3(x)
+        out = self.upsample(x)
 
-    x = self.upsample(x)
-    layer2 = self.layer2_1x1(layer2)
-    x = torch.cat([x, layer2], dim=1)
-    x = self.conv_up2(x)
+        # To simulate 3 channels
+        out = torch.cat([out, out, out], dim=1)
+        out = self.base_model(out)
 
-    x = self.upsample(x)
-    layer1 = self.layer1_1x1(layer1)
-    x = torch.cat([x, layer1], dim=1)
-    x = self.conv_up1(x)
+        return out
 
-    x = self.upsample(x)
-    layer0 = self.layer0_1x1(layer0)
-    x = torch.cat([x, layer0], dim=1)
-    x = self.conv_up0(x)
 
-    x = self.upsample(x)
-    x = torch.cat([x, x_original], dim=1)
-    x = self.conv_original_size2(x)
+class DenseNet121(nn.Module):
 
-    out = self.conv_last(x)
+    def __init__(self, pretrained=True):
 
-    return out
+        super().__init__()
+
+        # resample to 224 x 224 spatial sizes
+        self.upsample = nn.Upsample(
+            size=(224, 224), mode='bilinear', align_corners=True)
+
+        self.base_model = torch.hub.load(
+            'pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+
+        # reshape the ouput layer
+        self.base_model.classifier = nn.Linear(1024, 1)
+        self.base_model.classifier.requires_grad = True
+
+        # freeze everything but the last layer
+        for name, param in self.named_parameters():
+            if "classifier" in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = not pretrained
+
+    def forward(self, x):
+
+        out = self.upsample(x)
+
+        # To simulate 3 channels
+        out = torch.cat([out, out, out], dim=1)
+        out = self.base_model(out)
+
+        return out

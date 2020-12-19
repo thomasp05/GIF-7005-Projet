@@ -1,10 +1,13 @@
 import copy
 import os
+import random
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchvision.transforms
+from augmentations import *
 from pydicom import dcmread
 
 
@@ -16,21 +19,24 @@ def train_test_split(dataset, test_size=0.2):
     if isinstance(test_size, float):
         test_size = int(len(dataset) * test_size)
 
-        idx = torch.randperm(len(dataset))
-        train_idx = idx[test_size:]
-        test_idx = idx[:test_size]
+    idx = torch.randperm(len(dataset))
+    train_idx = idx[test_size:]
+    test_idx = idx[:test_size]
 
-        test_set.id = test_set.id[test_idx]
-        test_set.update()
+    test_set.id = test_set.id[test_idx]
+    test_set.update()
+    test_set.transforms = None
 
-        train_set.id = train_set.id[train_idx]
-        train_set.update()
+    train_set.id = train_set.id[train_idx]
+    train_set.update()
 
     return train_set, test_set
 
 
 class dcm_dataset(torch.utils.data.Dataset):
-    def __init__(self, directory, transforms=None):
+
+    def __init__(self, directory,
+                 transforms=torchvision.transforms.Compose([Downsample(), ImageTransform()])):
         """
         directory needs to contain the 'stage_2_train_labels.csv' file and the
         'stage_2_train_images' subdirectory
@@ -74,15 +80,20 @@ class dcm_dataset(torch.utils.data.Dataset):
             bounding_box[:, bb[1]:bb[1] + bb[3], bb[0]:bb[0] +
                          bb[2]] = torch.tensor(1.)
 
+        sample = img, (target, bounding_box)
+
         if self.transforms:
 
-            img, bounding_box = self.transforms(img, bounding_box)
+            sample = self.transforms(sample)
 
-        return img, (target, bounding_box)
+        return sample
 
     def display(self):
+        """
+        Deprecated: doesn't work with transforms
+        """
 
-        idx = np.random.randint(0, len(dset), 8)
+        idx = np.random.randint(0, len(self), 8)
 
         for i in range(idx.shape[0]):
 
@@ -155,3 +166,11 @@ class dcm_dataset(torch.utils.data.Dataset):
                 if id in self.img_files[idx]:
                     self.img_idx.append(idx)
                     continue
+
+    def subset(self, fraction=0.25):
+
+        idx_to_keep = torch.randint(
+            0, len(self.id), (int(fraction * len(self.id)), 1)).squeeze()
+
+        self.id = self.id[idx_to_keep]
+        self.update()
