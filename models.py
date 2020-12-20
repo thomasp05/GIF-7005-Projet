@@ -182,10 +182,16 @@ class Inception_v3(nn.Module):
     def __init__(self, pretrained=True):
 
         super().__init__()
+        self._return_grad = False
 
         # resample to 299 x 299 spatial sizes
         self.upsample = nn.Upsample(
             size=(299, 299), mode='bilinear', align_corners=True)
+
+        self.upsample_grad = nn.Upsample(
+            size=(512, 512), mode='bilinear', align_corners=True)
+
+        self.relu = nn.ReLU()
 
         self.base_model = torchvision.models.inception_v3(
             pretrained=pretrained)
@@ -202,10 +208,87 @@ class Inception_v3(nn.Module):
         out = self.upsample(x)
 
         # To simulate 3 channels
-        out = torch.cat([out, out, out], dim=1)
-        out = self.base_model(out)
+        if not self._return_grad:
+            out = torch.cat([out, out, out], dim=1)
+            out = self.base_model(out)
+        else:
+            out = self.to_grad(x)
 
         return out
+
+    def to_fmap(self, x):
+
+        x = self.upsample(x)
+        x = torch.cat([x, x, x], dim=1)
+
+        x = self.base_model.Conv2d_1a_3x3(x)
+        # N x 32 x 149 x 149
+        x = self.base_model.Conv2d_2a_3x3(x)
+        # N x 32 x 147 x 147
+        x = self.base_model.Conv2d_2b_3x3(x)
+        # N x 64 x 147 x 147
+        x = self.base_model.maxpool1(x)
+        # N x 64 x 73 x 73
+        x = self.base_model.Conv2d_3b_1x1(x)
+        # N x 80 x 73 x 73
+        x = self.base_model.Conv2d_4a_3x3(x)
+        # N x 192 x 71 x 71
+        x = self.base_model.maxpool2(x)
+        # N x 192 x 35 x 35
+        x = self.base_model.Mixed_5b(x)
+        # N x 256 x 35 x 35
+        x = self.base_model.Mixed_5c(x)
+        # N x 288 x 35 x 35
+        x = self.base_model.Mixed_5d(x)
+        # N x 288 x 35 x 35
+        x = self.base_model.Mixed_6a(x)
+        # N x 768 x 17 x 17
+        x = self.base_model.Mixed_6b(x)
+        # N x 768 x 17 x 17
+        x = self.base_model.Mixed_6c(x)
+        # N x 768 x 17 x 17
+        x = self.base_model.Mixed_6d(x)
+        # N x 768 x 17 x 17
+        x = self.base_model.Mixed_6e(x)
+        # N x 768 x 17 x 17
+        x = self.base_model.Mixed_7a(x)
+        # N x 1280 x 8 x 8
+        x = self.base_model.Mixed_7b(x)
+        # N x 2048 x 8 x 8
+        x = self.base_model.Mixed_7c(x)
+        # N x 2048 x 8 x 8
+
+        return x
+
+    def to_pred(self, x):
+
+        x = self.base_model.avgpool(x)
+        # N x 2048 x 1 x 1
+        x = self.base_model.dropout(x)
+        # N x 2048 x 1 x 1
+        x = torch.flatten(x, 1)
+        # N x 2048
+        x = self.base_model.fc(x)
+        # N x 1000 (num_classes)
+        return x
+
+    def to_grad(self, x):
+
+        fmap = self.to_fmap(x).detach()
+        fmap.requires_grad = True
+
+        pred = self.to_pred(fmap)
+        pred.backward()
+
+        grad = self.upsample_grad(
+            self.relu(fmap.grad * fmap.detach()
+                      ).sum(dim=1, keepdims=True))
+
+        return grad
+
+    def return_grad(self, bool_=True):
+
+        self._return_grad = True
 
 
 class FCN(nn.Module):
