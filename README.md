@@ -6,3 +6,4 @@ Notebooks:
  - segmentation.ipynb : notebook utilisé pour l'entrainement des modèles de segmentation
  - DenseNet_train_colab : notebook utilisé pour l'entrainement le modèle de classification DenseNet
  - vgg16.ipynb : notebook utilisé pour l'entrainement le modèle de classification VGG16
+ - grad_cam.ipynb : notebook utilisé pour analyser les résultats de l'analyse de gradient
